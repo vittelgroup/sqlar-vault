@@ -1,21 +1,17 @@
 import { createSQLiteStorage } from "./FileStorageManager.ts";
 import fs from "node:fs/promises";
+import path from "path";
 
 async function main() {
-  const fileToStore = await fs.readFile("image_3EB090335112C0E5EFE98A.jpeg");
+  const fileToStore = await fs.readFile(
+    path.resolve("src", "tests", "testFiles", "189819_1080p.mp4"),
+  );
 
   const storage = await createSQLiteStorage("test.sqlar");
-  await storage.deleteFile(["root"], "image_3EB090335112C0E5EFE98A.jpeg");
-  await storage.storeFile(
-    ["root"],
-    "image_3EB090335112C0E5EFE98A.jpeg",
-    fileToStore,
-  );
-  const file = await storage.retrieveFile(
-    ["root"],
-    "image_3EB090335112C0E5EFE98A.jpeg",
-  );
-  console.log({ file });
+  await storage.deleteFile(["root", "shared"], "189819_1080p.mp4");
+  await storage.storeFile(["root", "shared"], "189819_1080p.mp4", fileToStore);
+  await storage.deleteDirectoryFiles(["root", "images"]);
+  await storage.deleteDirectoryFiles(["root", "shared"]);
 }
 
 main().catch((err) => {

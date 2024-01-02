@@ -9,6 +9,7 @@
     "dist/",
     "vite.config.ts",
     "vite.config.js",
+    "jest.config.js",
     "esbuild.mjs"
   ],
   "parserOptions": {
@@ -17,6 +18,7 @@
   },
   "rules": {
     "@typescript-eslint/explicit-function-return-type": "off",
-    "comma-dangle": ["off"]
+    "comma-dangle": ["off"],
+    "@typescript-eslint/promise-function-async": "off"
   }
 }

@@ -36,7 +36,8 @@
   ],
   "scripts": {
     "watch": "tsx watch src/index.ts",
-    "build": "node esbuild.mjs && cp src/sqlite_extensions/sqlar.so dist/"
+    "build": "node esbuild.mjs && cp src/sqlite_extensions/sqlar.so dist/",
+    "test": "vitest"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
