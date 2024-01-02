@@ -149,7 +149,7 @@ export class FileStorageManager {
         "SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE ?",
       )
       .all(`/${sanitizedPath}/%`) as Array<Omit<SQLarFile, "data">>;
-    return files;
+    return { files, success: true };
   }
 
   /**

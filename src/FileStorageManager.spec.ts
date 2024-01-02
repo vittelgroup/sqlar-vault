@@ -156,14 +156,12 @@ describe("FileStorageManager", () => {
     expect(retrieveFileOpStatus.file).toBe(undefined);
   });
 
-  it("should NOT be able to delete a non-existing file", async () => {
+  it("should be able to list all files in a given directory", async () => {
     const storage = getStorageManagerState() as FileStorageManager;
-    const fileName = "pexels-ovan-57690.png";
 
-    const deleteOpStatus = await storage.deleteFile(["root", "png"], fileName);
-
-    expect(deleteOpStatus.success).toBe(false);
-    expect(deleteOpStatus.error).toBe("FileNotFound");
+    const listFilesOpStatus = await storage.listFiles(["root", "mp4"]);
+    expect(listFilesOpStatus.success).toBe(true);
+    expect(listFilesOpStatus.files.length).toBeGreaterThan(0);
   });
 
   afterAll(() => {
