@@ -8,13 +8,15 @@
     "node_modules/",
     "dist/",
     "vite.config.ts",
-    "vite.config.js"
+    "vite.config.js",
+    "esbuild.mjs"
   ],
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "rules": {
-    "@typescript-eslint/explicit-function-return-type": "off"
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "comma-dangle": ["off"]
   }
 }
