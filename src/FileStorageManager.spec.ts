@@ -9,6 +9,7 @@ import {
   getStorageManagerState,
   setStorageManagerState,
 } from "./tests/fixtures/storageDB.ts";
+import { mockTextFiles } from "./tests/mocks/mockFiles.ts";
 
 const storageDBName = `test_${Date.now()}.sqlar`;
 
@@ -37,6 +38,29 @@ describe("FileStorageManager", () => {
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.length);
+    expect(file).toHaveProperty("data");
+  });
+
+  it("should be able to store a blob text file and retrieve it", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "hello.txt";
+    const fileContent =
+      "Hello World!\nLoremIpsum\nNeque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit...";
+
+    const originalFile = new Blob([fileContent], { type: "text/plain" });
+
+    await storage.storeFile(["root", "blob"], fileName, originalFile);
+
+    const { success, file } = await storage.retrieveFile(
+      ["root", "blob"],
+      fileName,
+    );
+
+    expect(success).toBe(true);
+    expect(file).toHaveProperty("name", `/root/blob/${fileName}`);
+    expect(file).toHaveProperty("mode", 0o644);
+    expect(file).toHaveProperty("mtime");
+    expect(file).toHaveProperty("sz", originalFile.size);
     expect(file).toHaveProperty("data");
   });
 
@@ -156,12 +180,197 @@ describe("FileStorageManager", () => {
     expect(retrieveFileOpStatus.file).toBe(undefined);
   });
 
+  it("should NOT be able to delete a non-existing file", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "non-existing.png";
+
+    const deleteOpStatus = await storage.deleteFile(["root", "png"], fileName);
+
+    expect(deleteOpStatus.success).toBe(false);
+    expect(deleteOpStatus.error).toBe("FileNotFound");
+  });
+
+  it("should NOT be able to retrieve a non-existing file", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "non-existing.png";
+
+    const retrieveFileOpStatus = await storage.retrieveFile(
+      ["root", "png"],
+      fileName,
+    );
+
+    expect(retrieveFileOpStatus.success).toBe(false);
+    expect(retrieveFileOpStatus.error).toBe("FileNotFound");
+    expect(retrieveFileOpStatus.file).toBe(undefined);
+  });
+
   it("should be able to list all files in a given directory", async () => {
     const storage = getStorageManagerState() as FileStorageManager;
 
-    const listFilesOpStatus = await storage.listFiles(["root", "mp4"]);
+    const listFilesOpStatus = await storage.listFiles(["root"]);
     expect(listFilesOpStatus.success).toBe(true);
     expect(listFilesOpStatus.files.length).toBeGreaterThan(0);
+    expect(listFilesOpStatus.totalFiles).toBeGreaterThan(0);
+    expect(listFilesOpStatus.currentPage).toBe(1);
+  });
+
+  it("should be able to list all files in a given directory ordered by 'name' descending", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const textFiles = mockTextFiles();
+    let multiplier = 1;
+    for (const { fileName, file } of textFiles) {
+      await storage.storeFile(
+        ["root", "text"],
+        fileName,
+        file,
+        Math.round(Date.now() / 1000) + multiplier,
+      );
+      multiplier = multiplier + 2;
+    }
+
+    const list20FilesDescOpStatus = await storage.listFiles(
+      ["root", "text"],
+      20,
+      1,
+      "name",
+      "DESC",
+    );
+    expect(list20FilesDescOpStatus.success).toBe(true);
+    expect(list20FilesDescOpStatus.files.length).toBe(20);
+    expect(list20FilesDescOpStatus.files[0].name).toBe(
+      "/root/text/z_hello.txt",
+    );
+    expect(list20FilesDescOpStatus.totalFiles).toBe(25);
+    expect(list20FilesDescOpStatus.currentPage).toBe(1);
+  });
+
+  it("should be able to search all files in a given directory that contains '_hello.txt'", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const searchedFilesInDirectory = await storage.searchFiles(
+      "_hello.txt",
+      ["root", "text"],
+      20,
+      1,
+      "name",
+      "DESC",
+    );
+    expect(searchedFilesInDirectory.success).toBe(true);
+    expect(searchedFilesInDirectory.files.length).toBe(20);
+    expect(searchedFilesInDirectory.files[0].name).toBe(
+      "/root/text/z_hello.txt",
+    );
+
+    const searchedFilesInStorage = await storage.searchFiles(
+      "_hello.txt",
+      [],
+      20,
+      1,
+      "name",
+      "DESC",
+    );
+    expect(searchedFilesInStorage.success).toBe(true);
+    expect(searchedFilesInStorage.files.length).toBe(20);
+    expect(searchedFilesInStorage.files[0].name).toBe("/root/text/z_hello.txt");
+  });
+
+  it("should be able to list all files in a given directory ordered by 'mtime' ascending", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const list5FilesAscOpStatus = await storage.listFiles(
+      ["root", "text"],
+      20,
+      1,
+      "mtime",
+      "ASC",
+    );
+
+    expect(list5FilesAscOpStatus.success).toBe(true);
+    expect(list5FilesAscOpStatus.files.length).toBe(20);
+    expect(list5FilesAscOpStatus.files[0].name).toBe("/root/text/a_hello.txt");
+    expect(list5FilesAscOpStatus.totalFiles).toBe(25);
+    expect(list5FilesAscOpStatus.currentPage).toBe(1);
+  });
+
+  it("should return an empty array on a non-existing directory", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const listFilesInEmptyDirOpStatus = await storage.listFiles([""]);
+
+    expect(listFilesInEmptyDirOpStatus.success).toBe(true);
+    expect(listFilesInEmptyDirOpStatus.files.length).toBe(0);
+    expect(listFilesInEmptyDirOpStatus.totalFiles).toBe(0);
+
+    const listFilesInNonExistingDirOpStatus = await storage.listFiles([
+      "non-existing-directory",
+    ]);
+
+    expect(listFilesInNonExistingDirOpStatus.success).toBe(true);
+    expect(listFilesInNonExistingDirOpStatus.files.length).toBe(0);
+    expect(listFilesInNonExistingDirOpStatus.totalFiles).toBe(0);
+  });
+
+  it("should NOT be able to delete all files in a non-existing or empty directory", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const listFilesInNonExistingDirOpStatus = await storage.listFiles([
+      "non-existing-directory",
+    ]);
+
+    expect(listFilesInNonExistingDirOpStatus.files.length).toBe(0);
+
+    const deleteNonExistingDirOpStatus = await storage.deleteDirectoryFiles([
+      "non-existing-directory",
+    ]);
+
+    expect(deleteNonExistingDirOpStatus.success).toBe(false);
+    expect(deleteNonExistingDirOpStatus.error).toBe("DirectoryAlreadyEmpty");
+
+    const deleteEmptyDirDirOpStatus = await storage.deleteDirectoryFiles([""]);
+
+    expect(deleteEmptyDirDirOpStatus.success).toBe(false);
+    expect(deleteEmptyDirDirOpStatus.error).toBe("DirectoryAlreadyEmpty");
+  });
+
+  it("should be able to delete all files in an existing directory", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const listFilesOpStatus = await storage.listFiles(["root", "blob"]);
+
+    expect(listFilesOpStatus.files.length).toBeGreaterThan(0);
+
+    const deleteOpStatus = await storage.deleteDirectoryFiles(["root", "blob"]);
+
+    expect(deleteOpStatus.success).toBe(true);
+
+    const listFilesAfterDeleteOpStatus = await storage.listFiles([
+      "root",
+      "blob",
+    ]);
+
+    expect(listFilesAfterDeleteOpStatus.success).toBe(true);
+    expect(listFilesAfterDeleteOpStatus.files.length).toBe(0);
+  });
+
+  it("should be able to count all files from the storage", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+
+    const { total } = await storage.getTotalFiles();
+
+    expect(total).toBeGreaterThan(0);
+  });
+
+  it("should be able to delete all files from the storage", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const { total } = await storage.getTotalFiles();
+
+    expect(total).toBeGreaterThan(0);
+
+    await storage.deleteAllFiles();
+
+    const { total: totalFilesAfterDeletion } = await storage.getTotalFiles();
+
+    expect(totalFilesAfterDeletion).toBe(0);
   });
 
   afterAll(() => {

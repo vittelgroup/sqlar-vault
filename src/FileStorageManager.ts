@@ -44,6 +44,15 @@ export class FileStorageManager {
   }
 
   /**
+   * Retrieves the total number of files stored in the database.
+   * @returns An object containing the total number of files.
+   */
+  async getTotalFiles() {
+    const countFiles = this.db.prepare("SELECT count(*) as total FROM sqlar");
+    return countFiles.get() as { total: number };
+  }
+
+  /**
    * Stores a file in the specified directory with the given file name.
    * If the file already exists, it returns an error.
    *
@@ -52,9 +61,15 @@ export class FileStorageManager {
    * @param fileName - The name of the file.
    * Example: "profile.jpeg"
    * @param file - The file to be stored, either as a Blob or a Buffer.
+   * @param modifiedTime - (optional) The modified time of the file in seconds (Default is Date.now() / 1000).
    * @returns An object indicating the success of the operation and the file details.
    */
-  async storeFile(dir: string[], fileName: string, file: Blob | Buffer) {
+  async storeFile(
+    dir: string[],
+    fileName: string,
+    file: Blob | Buffer,
+    modifiedTime: number = Math.round(Date.now() / 1000),
+  ) {
     const fileNameWithPath = this.createFileNameWithPath(dir, fileName);
 
     if (this.fileExists(fileNameWithPath)) {
@@ -83,7 +98,7 @@ export class FileStorageManager {
       .run(
         fileNameWithPath,
         0o644,
-        Math.round(Date.now() / 1000),
+        modifiedTime,
         fileBuffer.byteLength,
         fileBuffer,
       );
@@ -138,30 +153,121 @@ export class FileStorageManager {
   }
 
   /**
-   * Retrieves a list of files in the specified directory.
+   * Retrieves a list of files from the specified directory.
+   *
    * @param dir - The directory path.
-   * @returns An array of files in the directory.
+   * @param filesPerPage - The number of files to retrieve per page. Default is 20.
+   * @param pageNumber - The page number to retrieve. Default is 1.
+   * @param orderBy - The field to order the files by. Valid values are "name", "mtime", or "sz". Default is "name".
+   * @param order - The order in which to sort the files. Valid values are "ASC" or "DESC". Default is "ASC".
+   * @returns An object containing the list of files, current page, total files and a success flag.
    */
-  async listFiles(dir: string[]) {
+  async listFiles(
+    dir: string[],
+    filesPerPage: number = 20,
+    pageNumber: number = 1,
+    orderBy: "name" | "mtime" | "sz" = "name",
+    order: "ASC" | "DESC" = "ASC",
+  ) {
+    const skip = pageNumber <= 1 ? 0 : (pageNumber - 1) * filesPerPage;
+
     const sanitizedPath = this.sanitizePath(dir).join("/");
-    const files = this.db
-      .prepare<SQLarFile["name"]>(
-        "SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE ?",
-      )
-      .all(`/${sanitizedPath}/%`) as Array<Omit<SQLarFile, "data">>;
-    return { files, success: true };
+    const countFiles = this.db.prepare<SQLarFile["name"]>(
+      "SELECT count(*) as total FROM sqlar WHERE name LIKE ?",
+    );
+    const files = this.db.prepare<{
+      name: SQLarFile["name"];
+      skip: typeof skip;
+      filesPerPage: typeof filesPerPage;
+    }>(
+      `SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
+    );
+
+    const transaction = this.db.transaction(() => {
+      const { total } = countFiles.get(`/${sanitizedPath}/%`) as {
+        total: number;
+      };
+      const filesList = files.all({
+        name: `/${sanitizedPath}/%`,
+        skip,
+        filesPerPage,
+      }) as Array<Omit<SQLarFile, "data">>;
+      return { totalFiles: total, filesList };
+    })();
+
+    return {
+      files: transaction.filesList,
+      totalFiles: transaction.totalFiles,
+      currentPage: pageNumber,
+      success: true,
+    };
+  }
+
+  /**
+   * Search files in the specified directory, if an empty array is provided, it will search in all directories.
+   *
+   * @param fileName - The file name.
+   * @param dir - The directory path (can be and empty array '[]' to search in all directories).
+   * @param filesPerPage - The number of files to retrieve per page. Default is 20.
+   * @param pageNumber - The page number to retrieve. Default is 1.
+   * @param orderBy - The field to order the files by. Valid values are "name", "mtime", or "sz". Default is "name".
+   * @param order - The order in which to sort the files. Valid values are "ASC" or "DESC". Default is "ASC".
+   * @returns An object containing the list of files, current page, total files and a success flag.
+   */
+  async searchFiles(
+    fileName: string,
+    dir: string[],
+    filesPerPage: number = 20,
+    pageNumber: number = 1,
+    orderBy: "name" | "mtime" | "sz" = "name",
+    order: "ASC" | "DESC" = "ASC",
+  ) {
+    const skip = pageNumber <= 1 ? 0 : (pageNumber - 1) * filesPerPage;
+
+    let sanitizedPath = this.sanitizePath(dir).join("/");
+    if (sanitizedPath === "") {
+      sanitizedPath = "%";
+    } else {
+      sanitizedPath = `/${sanitizedPath}/%`;
+    }
+
+    const countFiles = this.db.prepare<SQLarFile["name"]>(
+      "SELECT count(*) as total FROM sqlar WHERE name LIKE ?",
+    );
+    const files = this.db.prepare<{
+      name: SQLarFile["name"];
+      skip: typeof skip;
+      filesPerPage: typeof filesPerPage;
+    }>(
+      `SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
+    );
+
+    const transaction = this.db.transaction(() => {
+      const { total } = countFiles.get(`${sanitizedPath}${fileName}%`) as {
+        total: number;
+      };
+      const filesList = files.all({
+        name: `${sanitizedPath}${fileName}%`,
+        skip,
+        filesPerPage,
+      }) as Array<Omit<SQLarFile, "data">>;
+      return { totalFiles: total, filesList };
+    })();
+
+    return {
+      files: transaction.filesList,
+      totalFiles: transaction.totalFiles,
+      currentPage: pageNumber,
+      success: true,
+    };
   }
 
   /**
    * Deletes all files from the storage.
    * @returns A promise that resolves to an object indicating the success of the operation.
-   * If there are no files to delete, it returns an error 'NoFilesToDelete'.
    */
   async deleteAllFiles() {
-    const result = this.db.prepare("DELETE FROM sqlar").run();
-    if (result.changes === 0) {
-      return { success: false, error: "NoFilesToDelete" };
-    }
+    this.db.prepare("DELETE FROM sqlar").run();
     return { success: true };
   }
 
@@ -171,7 +277,6 @@ export class FileStorageManager {
    * @param dir - An array of directory names.
    * Example: ["root", "images"] | Delete all files in the '/root/images' directory.
    * @returns An object indicating the success of the operation.
-   * If the param 'dir' is an empty array, it returns an error 'InvalidDirectoryPath'.
    * If the directory is empty, it returns an error 'DirectoryAlreadyEmpty'.
    */
   async deleteDirectoryFiles(dir: string[]) {
@@ -179,7 +284,7 @@ export class FileStorageManager {
     if (sanitizedPath === "") {
       return {
         success: false,
-        error: "InvalidDirectoryPath",
+        error: "DirectoryAlreadyEmpty",
       };
     }
     const directoryToDelete = `/${sanitizedPath}/%`;
