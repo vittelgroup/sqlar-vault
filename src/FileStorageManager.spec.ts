@@ -1,21 +1,21 @@
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import {
   type FileStorageManager,
-  createSQLiteStorage,
+  createSQLiteVault,
 } from "./FileStorageManager.ts";
 import fs from "node:fs/promises";
 import path from "path";
 import {
   getStorageManagerState,
   setStorageManagerState,
-} from "./tests/fixtures/storageDB.ts";
-import { mockTextFiles } from "./tests/mocks/mockFiles.ts";
+} from "./tests-utils/fixtures/storageDB.ts";
+import { mockTextFiles } from "./tests-utils/mocks/mockFiles.ts";
 
 const storageDBName = `test_${Date.now()}.sqlar`;
 
 describe("FileStorageManager", () => {
   beforeAll(async () => {
-    setStorageManagerState(await createSQLiteStorage(storageDBName));
+    setStorageManagerState(await createSQLiteVault(storageDBName));
   });
 
   it("should be able to store a pdf file and retrieve it", async () => {
@@ -23,7 +23,7 @@ describe("FileStorageManager", () => {
     const fileName = "drylab.pdf";
 
     const originalFile = await fs.readFile(
-      path.resolve("src", "tests", "testFiles", fileName),
+      path.resolve("src", "tests-utils", "mocks", fileName),
     );
 
     await storage.storeFile(["root", "pdf"], fileName, originalFile);
@@ -69,7 +69,7 @@ describe("FileStorageManager", () => {
     const fileName = "189819_1080p.mp4";
 
     const originalFile = await fs.readFile(
-      path.resolve("src", "tests", "testFiles", fileName),
+      path.resolve("src", "tests-utils", "mocks", fileName),
     );
 
     await storage.storeFile(["root", "mp4"], fileName, originalFile);
@@ -92,7 +92,7 @@ describe("FileStorageManager", () => {
     const fileName = "neom-THlO6Mkf5uI-unsplash.jpg";
 
     const originalFile = await fs.readFile(
-      path.resolve("src", "tests", "testFiles", fileName),
+      path.resolve("src", "tests-utils", "mocks", fileName),
     );
 
     await storage.storeFile(["root", "jpg"], fileName, originalFile);
@@ -115,7 +115,7 @@ describe("FileStorageManager", () => {
     const fileName = "pexels-ovan-57690.png";
 
     const originalFile = await fs.readFile(
-      path.resolve("src", "tests", "testFiles", fileName),
+      path.resolve("src", "tests-utils", "mocks", fileName),
     );
 
     await storage.storeFile(["root", "png"], fileName, originalFile);
@@ -138,7 +138,7 @@ describe("FileStorageManager", () => {
     const fileName = "pexels-ovan-57690.png";
 
     const originalFile = await fs.readFile(
-      path.resolve("src", "tests", "testFiles", fileName),
+      path.resolve("src", "tests-utils", "mocks", fileName),
     );
 
     const { success, file: fileWithTheSameName } = await storage.retrieveFile(

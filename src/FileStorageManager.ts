@@ -304,7 +304,7 @@ export class FileStorageManager {
  * @param databasePath The path to the SQLite database file.
  * @returns A promise that resolves to a FileStorageManager instance.
  */
-export async function createSQLiteStorage(
+export async function createSQLiteVault(
   databasePath: string,
 ): Promise<FileStorageManager> {
   const db = new BetterDatabase(databasePath, {
@@ -314,7 +314,7 @@ export async function createSQLiteStorage(
   const extensionPath =
     process.env.NODE_ENV === "production"
       ? path.resolve(__dirname, "sqlar")
-      : path.resolve("src", "sqlite_extensions", "sqlar");
+      : path.resolve("src", "sqlite-extensions", "sqlar");
 
   db.loadExtension(extensionPath);
   db.pragma("journal_mode = WAL");
