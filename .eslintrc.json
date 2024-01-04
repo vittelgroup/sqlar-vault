@@ -4,14 +4,7 @@
     "node": true
   },
   "extends": ["standard-with-typescript", "plugin:prettier/recommended"],
-  "ignorePatterns": [
-    "node_modules/",
-    "dist/",
-    "vite.config.ts",
-    "vite.config.js",
-    "jest.config.js",
-    "esbuild.mjs"
-  ],
+  "ignorePatterns": ["node_modules/", "dist/", "tsup.config.ts", "esbuild.mjs"],
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module"

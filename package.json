@@ -1,6 +1,6 @@
 {
   "name": "sqlar-vault",
-  "private": true,
+  "private": false,
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/sqlar-vault.umd.cjs",
@@ -35,8 +35,8 @@
     "dist"
   ],
   "scripts": {
-    "watch": "tsx watch src/index.ts",
-    "build": "node esbuild.mjs && cp src/sqlite_extensions/sqlar.so dist/",
+    "watch": "tsup src/index.ts --watch",
+    "build": "tsup-node && cp src/sqlite-extensions/sqlar.so dist/",
     "test": "vitest"
   },
   "devDependencies": {
@@ -52,11 +52,9 @@
     "eslint-plugin-prettier": "^5.1.2",
     "eslint-plugin-promise": "^6.0.0",
     "prettier": "^3.1.1",
+    "tsup": "^8.0.1",
+    "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.1.1"
-  },
-  "dependencies": {
-    "esbuild": "^0.19.10",
-    "tsx": "^4.7.0"
   }
 }

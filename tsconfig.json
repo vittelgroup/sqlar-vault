@@ -5,6 +5,8 @@
     "module": "NodeNext",
     "lib": ["ES2020"],
     "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "./dist",
 
     /* Bundler mode */
     "allowImportingTsExtensions": true,
