@@ -12,4 +12,5 @@ export default defineConfig({
   outDir: "dist",
   target: "node18",
   dts: true,
+  format: ["cjs", "esm"],
 });

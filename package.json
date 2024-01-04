@@ -3,8 +3,8 @@
   "private": false,
   "version": "0.0.1",
   "type": "module",
-  "main": "./dist/sqlar-vault.umd.cjs",
-  "module": "./dist/sqlar-vault.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "description": "A package for managing files in sqlite3 with sqlar",
   "author": "Dionisio Vieira",
@@ -27,8 +27,8 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/sqlar-vault.js",
-      "require": "./dist/sqlar-vault.umd.cjs"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
