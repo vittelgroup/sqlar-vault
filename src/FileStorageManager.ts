@@ -107,6 +107,95 @@ export class FileStorageManager {
   }
 
   /**
+   * Renames a file in the storage.
+   * @param dir - The directory path of the file.
+   * @param fileName - The current name of the file.
+   * @param newFileName - The new name for the file.
+   * @param newDir - The new directory path for the file (optional).
+   * @returns An object indicating the success of the operation and the updated file information.
+   */
+  async renameFile(
+    dir: string[],
+    fileName: string,
+    newFileName: string,
+    newDir?: string[],
+  ) {
+    const fileNameWithPath = this.createFileNameWithPath(dir, fileName);
+    const newFileNameWithPath = this.createFileNameWithPath(
+      newDir ?? dir,
+      newFileName,
+    );
+    const fileExists = this.db.prepare<SQLarFile["name"]>(
+      "SELECT name FROM sqlar WHERE name = ?",
+    );
+
+    const updatedFile = this.db.prepare<
+      [SQLarFile["name"], SQLarFile["mtime"], SQLarFile["name"]]
+    >("UPDATE sqlar SET name = ?, mtime = ? WHERE name = ?");
+
+    const transaction = this.db.transaction(() => {
+      const file = fileExists.get(newFileNameWithPath) as SQLarFile | undefined;
+
+      if (file !== undefined && fileNameWithPath !== newFileNameWithPath) {
+        return { success: false, error: "FileAlreadyExists" };
+      }
+
+      updatedFile.run(
+        newFileNameWithPath,
+        Math.round(Date.now() / 1000),
+        fileNameWithPath,
+      );
+
+      return { success: true, newFileName, newFileNameWithPath };
+    })();
+
+    return transaction;
+  }
+
+  /**
+   * Updates the content of a file in the file storage.
+   * @param dir - The directory path where the file is located.
+   * @param fileName - The name of the file.
+   * @param newContent - The new content of the file as a Blob or Buffer.
+   * @param modifiedTime - (optional) The modified time of the file in seconds (Default is Date.now() / 1000).
+   * @returns An object indicating the success of the update operation and the updated file information.
+   */
+  async updateFileContent(
+    dir: string[],
+    fileName: string,
+    newContent: Blob | Buffer,
+    modifiedTime: number = Math.round(Date.now() / 1000),
+  ) {
+    const fileNameWithPath = this.createFileNameWithPath(dir, fileName);
+
+    if (!this.fileExists(fileNameWithPath)) {
+      return { success: false, error: "FileNotFound" };
+    }
+
+    let fileBuffer: Buffer;
+    if (newContent instanceof Blob) {
+      fileBuffer = await this.blobToBuffer(newContent);
+    } else {
+      fileBuffer = newContent;
+    }
+
+    this.db
+      .prepare<
+        [
+          SQLarFile["mtime"],
+          SQLarFile["sz"],
+          SQLarFile["data"],
+          SQLarFile["name"],
+        ]
+      >(
+        "UPDATE sqlar SET mtime = ?, sz = ?, data = sqlar_compress(?) WHERE name = ?",
+      )
+      .run(modifiedTime, fileBuffer.byteLength, fileBuffer, fileNameWithPath);
+
+    return { success: true, fileName, fileNameWithPath };
+  }
+
+  /**
    * Retrieves a file from the storage based on the specified directory and file name.
    * @param dir - The directory path of the file.
    * Example: ["root", "images", "profile"]
@@ -119,13 +208,23 @@ export class FileStorageManager {
     const fileNameWithPath = this.createFileNameWithPath(dir, fileName);
     const file = this.db
       .prepare<SQLarFile["name"]>(
-        "SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sqlar_uncompress(data,sz) as data, sz FROM sqlar WHERE name = ?",
+        "SELECT name, mode, mtime, sqlar_uncompress(data,sz) as data, sz FROM sqlar WHERE name = ?",
       )
       .get(fileNameWithPath) as SQLarFile | undefined;
     if (file === undefined) {
       return { success: false, error: "FileNotFound" };
     }
-    return { success: true, file };
+    return {
+      success: true,
+      file: {
+        fileNameWithPath: file.name,
+        name: fileName,
+        mode: file.mode,
+        mtime: file.mtime,
+        data: file.data,
+        sz: file.sz,
+      },
+    };
   }
 
   /**
@@ -180,7 +279,7 @@ export class FileStorageManager {
       skip: typeof skip;
       filesPerPage: typeof filesPerPage;
     }>(
-      `SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
+      `SELECT name, mode, mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
     );
 
     const transaction = this.db.transaction(() => {
@@ -192,7 +291,14 @@ export class FileStorageManager {
         skip,
         filesPerPage,
       }) as Array<Omit<SQLarFile, "data">>;
-      return { totalFiles: total, filesList };
+      return {
+        totalFiles: total,
+        filesList: filesList.map((f) => ({
+          ...f,
+          fileNameWithPath: f.name,
+          name: f.name.split("/").at(-1),
+        })),
+      };
     })();
 
     return {
@@ -239,7 +345,7 @@ export class FileStorageManager {
       skip: typeof skip;
       filesPerPage: typeof filesPerPage;
     }>(
-      `SELECT name, mode, datetime(mtime,'unixepoch') as mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
+      `SELECT name, mode, mtime, sz FROM sqlar WHERE name LIKE :name ORDER BY ${orderBy} ${order} LIMIT :skip, :filesPerPage`,
     );
 
     const transaction = this.db.transaction(() => {
@@ -251,7 +357,14 @@ export class FileStorageManager {
         skip,
         filesPerPage,
       }) as Array<Omit<SQLarFile, "data">>;
-      return { totalFiles: total, filesList };
+      return {
+        totalFiles: total,
+        filesList: filesList.map((f) => ({
+          ...f,
+          fileNameWithPath: f.name,
+          name: f.name.split("/").at(-1),
+        })),
+      };
     })();
 
     return {

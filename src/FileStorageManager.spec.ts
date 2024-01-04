@@ -34,7 +34,7 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(file).toHaveProperty("name", `/root/pdf/${fileName}`);
+    expect(file).toHaveProperty("fileNameWithPath", `/root/pdf/${fileName}`);
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.length);
@@ -57,7 +57,7 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(file).toHaveProperty("name", `/root/blob/${fileName}`);
+    expect(file).toHaveProperty("fileNameWithPath", `/root/blob/${fileName}`);
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.size);
@@ -71,7 +71,7 @@ describe("FileStorageManager", () => {
     const originalFile = await fs.readFile(
       path.resolve("src", "tests-utils", "mocks", fileName),
     );
-
+    console.log(fileName, originalFile.byteLength);
     await storage.storeFile(["root", "mp4"], fileName, originalFile);
 
     const { success, file } = await storage.retrieveFile(
@@ -80,7 +80,7 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(file).toHaveProperty("name", `/root/mp4/${fileName}`);
+    expect(file).toHaveProperty("fileNameWithPath", `/root/mp4/${fileName}`);
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.length);
@@ -103,7 +103,7 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(file).toHaveProperty("name", `/root/jpg/${fileName}`);
+    expect(file).toHaveProperty("fileNameWithPath", `/root/jpg/${fileName}`);
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.length);
@@ -126,7 +126,7 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(file).toHaveProperty("name", `/root/png/${fileName}`);
+    expect(file).toHaveProperty("fileNameWithPath", `/root/png/${fileName}`);
     expect(file).toHaveProperty("mode", 0o644);
     expect(file).toHaveProperty("mtime");
     expect(file).toHaveProperty("sz", originalFile.length);
@@ -147,7 +147,10 @@ describe("FileStorageManager", () => {
     );
 
     expect(success).toBe(true);
-    expect(fileWithTheSameName).toHaveProperty("name", `/root/png/${fileName}`);
+    expect(fileWithTheSameName).toHaveProperty(
+      "fileNameWithPath",
+      `/root/png/${fileName}`,
+    );
     expect(fileWithTheSameName).toHaveProperty("mode", 0o644);
     expect(fileWithTheSameName).toHaveProperty("mtime");
     expect(fileWithTheSameName).toHaveProperty("sz");
@@ -237,7 +240,7 @@ describe("FileStorageManager", () => {
     );
     expect(list20FilesDescOpStatus.success).toBe(true);
     expect(list20FilesDescOpStatus.files.length).toBe(20);
-    expect(list20FilesDescOpStatus.files[0].name).toBe(
+    expect(list20FilesDescOpStatus.files[0].fileNameWithPath).toBe(
       "/root/text/z_hello.txt",
     );
     expect(list20FilesDescOpStatus.totalFiles).toBe(25);
@@ -257,7 +260,7 @@ describe("FileStorageManager", () => {
     );
     expect(searchedFilesInDirectory.success).toBe(true);
     expect(searchedFilesInDirectory.files.length).toBe(20);
-    expect(searchedFilesInDirectory.files[0].name).toBe(
+    expect(searchedFilesInDirectory.files[0].fileNameWithPath).toBe(
       "/root/text/z_hello.txt",
     );
 
@@ -271,7 +274,9 @@ describe("FileStorageManager", () => {
     );
     expect(searchedFilesInStorage.success).toBe(true);
     expect(searchedFilesInStorage.files.length).toBe(20);
-    expect(searchedFilesInStorage.files[0].name).toBe("/root/text/z_hello.txt");
+    expect(searchedFilesInStorage.files[0].fileNameWithPath).toBe(
+      "/root/text/z_hello.txt",
+    );
   });
 
   it("should be able to list all files in a given directory ordered by 'mtime' ascending", async () => {
@@ -287,7 +292,9 @@ describe("FileStorageManager", () => {
 
     expect(list5FilesAscOpStatus.success).toBe(true);
     expect(list5FilesAscOpStatus.files.length).toBe(20);
-    expect(list5FilesAscOpStatus.files[0].name).toBe("/root/text/a_hello.txt");
+    expect(list5FilesAscOpStatus.files[0].fileNameWithPath).toBe(
+      "/root/text/a_hello.txt",
+    );
     expect(list5FilesAscOpStatus.totalFiles).toBe(25);
     expect(list5FilesAscOpStatus.currentPage).toBe(1);
   });
@@ -358,6 +365,117 @@ describe("FileStorageManager", () => {
     const { total } = await storage.getTotalFiles();
 
     expect(total).toBeGreaterThan(0);
+  });
+
+  it("should be able to rename a file", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "neom-THlO6Mkf5uI-unsplash.jpg";
+
+    const retrieveFileOpStatus = await storage.retrieveFile(
+      ["root", "jpg"],
+      fileName,
+    );
+
+    expect(retrieveFileOpStatus.success).toBe(true);
+    expect(retrieveFileOpStatus.file?.fileNameWithPath).toBe(
+      "/root/jpg/neom-THlO6Mkf5uI-unsplash.jpg",
+    );
+
+    const renameFileOpStatus = await storage.renameFile(
+      ["root", "jpg"],
+      fileName,
+      "neom-THlO6Mkf5uI-unsplash_RENAMED.jpg",
+    );
+
+    expect(renameFileOpStatus.success).toBe(true);
+    expect(renameFileOpStatus.newFileNameWithPath).toBe(
+      "/root/jpg/neom-THlO6Mkf5uI-unsplash_RENAMED.jpg",
+    );
+  });
+
+  it("should NOT be able to rename a file to an existing filename", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "neom-THlO6Mkf5uI-unsplash_RENAMED.jpg";
+
+    const retrieveFileOpStatus = await storage.retrieveFile(
+      ["root", "jpg"],
+      fileName,
+    );
+
+    expect(retrieveFileOpStatus.success).toBe(true);
+    expect(retrieveFileOpStatus.file?.fileNameWithPath).toBe(
+      "/root/jpg/neom-THlO6Mkf5uI-unsplash_RENAMED.jpg",
+    );
+
+    const renameFileOpStatus = await storage.renameFile(
+      ["root", "jpg"],
+      fileName,
+      "z_hello.txt",
+      ["root", "text"],
+    );
+
+    expect(renameFileOpStatus.success).toBe(false);
+    expect(renameFileOpStatus.error).toBe("FileAlreadyExists");
+  });
+
+  it("should be able to update a file content", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "neom-THlO6Mkf5uI-unsplash_RENAMED.jpg";
+
+    const retrieveOriginalFileOpStatus = await storage.retrieveFile(
+      ["root", "jpg"],
+      fileName,
+    );
+
+    expect(retrieveOriginalFileOpStatus.success).toBe(true);
+
+    const newContent = Buffer.from("Hello World!_NEW_CONTENT");
+
+    const updatedFile = await storage.updateFileContent(
+      ["root", "jpg"],
+      fileName,
+      newContent,
+      Math.round(Date.now() / 1000) + 5,
+    );
+    expect(updatedFile.success).toBe(true);
+
+    const retrieveUpdatedFileOpStatus = await storage.retrieveFile(
+      ["root", "jpg"],
+      fileName,
+    );
+
+    expect(
+      retrieveOriginalFileOpStatus.file?.sz !==
+        retrieveUpdatedFileOpStatus.file?.sz,
+    ).toBe(true);
+    expect(retrieveUpdatedFileOpStatus.file?.sz).toBe(newContent.byteLength);
+    expect(retrieveUpdatedFileOpStatus.file?.mtime).toBeGreaterThan(
+      retrieveOriginalFileOpStatus.file?.mtime ?? 0,
+    );
+  });
+
+  it("should NOT be able to update a non-existing file content", async () => {
+    const storage = getStorageManagerState() as FileStorageManager;
+    const fileName = "non-existing.jpg";
+
+    const retrieveOriginalFileOpStatus = await storage.retrieveFile(
+      ["root", "jpg"],
+      fileName,
+    );
+
+    expect(retrieveOriginalFileOpStatus.success).toBe(false);
+
+    const newContent = Buffer.from("Hello World!_NEW_CONTENT");
+
+    const updatedFile = await storage.updateFileContent(
+      ["root", "jpg"],
+      fileName,
+      newContent,
+      Math.round(Date.now() / 1000) + 5,
+    );
+    expect(updatedFile.success).toBe(false);
+
+    expect(updatedFile.error).toBe("FileNotFound");
   });
 
   it("should be able to delete all files from the storage", async () => {
